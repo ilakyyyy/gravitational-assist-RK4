@@ -1,4 +1,4 @@
-import defs, graficar
+import old_python.defs as defs, old_python.graficar as graficar
 
 def CalculateHamiltonian(bodies):
     n = len(bodies)
@@ -51,7 +51,7 @@ def RunSimulation(output_folder, initial_v_ph, initial_ship_v, total_time, facto
     Sun = Body("Sun", SUN_MASS, SUN_R0, SUN_V0)
     Venus = Body("Venus", VENUS_MASS, VENUS_R0, VENUS_V0)
     Ship = Body("Ship", SHIP_MASS, SHIP_R0, SHIP_V0)
-    bodies = np.array([Sun, Earth, Venus, Ship])
+    bodies = np.array([Ship, Sun, Earth, Venus])
 
 
     history_list = []

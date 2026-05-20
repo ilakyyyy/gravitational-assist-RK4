@@ -1,4 +1,4 @@
-import defs
+import old_python.defs as defs
 
 # Gravity engine:
 # It should take everything before and change everything

@@ -1,4 +1,4 @@
-import defs
+import old_python.defs as defs
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
 

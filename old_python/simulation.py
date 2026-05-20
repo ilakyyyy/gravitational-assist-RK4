@@ -1,4 +1,4 @@
-import defs, RK4integrator, functions, graficar
+import old_python.defs as defs, old_python.RK4integrator as RK4integrator, old_python.functions as functions, old_python.graficar as graficar
 
 #Initial parameters, S.I.:
 #Ship:
