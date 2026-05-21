@@ -22,6 +22,7 @@
 
 //Venus - perihelion data:
 #define VENUS_RADIUS 1.0
+#define COLLISION_DISTANCE 6152000.0 //Venus radius(6052km)+Atmosphere(let's make it ~100 km so as to not lose any energy to drag)
 #define VENUS_MASS 4.87e24
 #define VENUS_R0_P_X 1.082e11
 #define VENUS_R0_P_Y 0.0

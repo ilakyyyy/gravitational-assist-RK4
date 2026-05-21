@@ -119,6 +119,16 @@ int sim_id, int skip, int fps, double precision_factor) {
             min_distance = venus_dist;
         }
 
+        if (venus_dist <= COLLISION_DISTANCE) {
+            fclose(bin_file);
+            remove(bin_filename);
+            
+            char new_folder[MAX_CHAR * 2 + 32];
+            snprintf(new_folder, sizeof(new_folder), "%s_COLLISION", output_folder);
+            rename(output_folder, new_folder);
+            return;
+        }
+
         //11 doubles per step:
         //time_days, total_energy, ship_energy, ship_x, ship_y, sun_x, sun_y, venus_x, venus_y, earth_x, earth_y
         double row_data[3+ N_BODIES*2];

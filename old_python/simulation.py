@@ -42,8 +42,3 @@ for i in tqdm(range(total_sims)):
     ship_velocities = np.linspace(min_s_vel, max_s_vel, total_sims)
 
     RunSimulation(output_folder, venus_phases[i], ship_velocities[i], total_t, factor, i, skip, fps, create_gif, precision_factor)
-
-
-#Future upgrades:
-#   if v > something, just stop the simulation (don't let it end)
-#   we need to prevent planet collisions (or know when one has happened)
