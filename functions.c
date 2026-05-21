@@ -73,11 +73,18 @@ int sim_id, int skip, int fps, double precision_factor) {
 
     //Initialize bodies array
     Body bodies[N_BODIES] = {
-        [SHIP_INDEX]  = {"Ship",  SHIP_MASS,  {SHIP_R0_X, SHIP_R0_Y},   {0.0, initial_ship_v}},
+        [SHIP_INDEX]  = {"Ship",  SHIP_MASS,  {SHIP_R0_X, SHIP_R0_Y},   {0.0, 0.0}},
         [SUN_INDEX]   = {"Sun",   SUN_MASS,   {SUN_R0_X, SUN_R0_Y},     {SUN_V0_X, SUN_V0_Y}},
-        [VENUS_INDEX] = {"Venus", VENUS_MASS, {Venus_R0_X, Venus_R0_Y}, {Venus_V0_X, Venus_V0_Y}},
+        [VENUS_INDEX] = {"Venus", VENUS_MASS, {0.0, 0.0},               {0.0, 0.0}},
         [EARTH_INDEX] = {"Earth", EARTH_MASS, {EARTH_R0_X, EARTH_R0_Y}, {EARTH_V0_X, EARTH_V0_Y}}
     };
+    
+    //Assign the variables generated dynamically so as to keep the compiler happy
+    bodies[SHIP_INDEX].vel[1] = initial_ship_v;
+    bodies[VENUS_INDEX].pos[0] = Venus_R0_X;
+    bodies[VENUS_INDEX].pos[1] = Venus_R0_Y;
+    bodies[VENUS_INDEX].vel[0] = Venus_V0_X;
+    bodies[VENUS_INDEX].vel[1] = Venus_V0_Y;
 
     double sim_time = 0.0, dt;
     double max_time = total_time * 24.0 * 3600.0;

@@ -27,9 +27,9 @@ void CalculateAccelerations(int n, double* masses, double* positions, double* ac
 }
 
 void GravityEngine(double dt, Body* bodies, int n){
-    double positions[2*n];
-    double velocities[2*n];
-    double masses[n];
+    double positions[2*N_BODIES];
+    double velocities[2*N_BODIES];
+    double masses[N_BODIES];
     
     //Set to current state
     for (int i= 0; i<n; i++){
@@ -41,11 +41,11 @@ void GravityEngine(double dt, Body* bodies, int n){
     }
     
     //Arrays for RK4 "ghost" states
-    double ghost_pos[2*n];
-    double k1_v[2*n], k1_r[2*n];
-    double k2_v[2*n], k2_r[2*n];
-    double k3_v[2*n], k3_r[2*n];
-    double k4_v[2*n], k4_r[2*n];
+    double ghost_pos[2*N_BODIES];
+    double k1_v[2*N_BODIES], k1_r[2*N_BODIES];
+    double k2_v[2*N_BODIES], k2_r[2*N_BODIES];
+    double k3_v[2*N_BODIES], k3_r[2*N_BODIES];
+    double k4_v[2*N_BODIES], k4_r[2*N_BODIES];
 
     //k1
     for (int i= 0; i<n; i++){

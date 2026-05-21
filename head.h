@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <stdlib.h>
+#include <omp.h>
 
 #define PI 3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825
 #define MAX_CHAR 128
@@ -69,10 +71,11 @@ double CalculateHamiltonian(Body* bodies, int n);
 double ShipHamiltonian(Body* bodies, int n);
 double MinimumDistance(Body* bodies, int index);
 void CalculateSweep(double min, double max, double* sweep, int n);
+void RunSimulation(char* output_folder, double initial_v_ph, double initial_ship_v, double total_time, double factor, 
+int sim_id, int skip, int fps, double precision_factor);
 
 //RK4integrator.c
 void GravityEngine(double dt, Body* bodies, int n);
-void RunSimulation(char* output_folder, double initial_v_ph, double initial_ship_v, double total_time, double factor, 
-int sim_id, int skip, int fps, double precision_factor);
+
 
 #endif
