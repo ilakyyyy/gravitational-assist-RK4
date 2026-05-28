@@ -6,9 +6,12 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg') # Ensures thread-safe, headless rendering
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import pyvista as pv
+import multiprocessing
+
+MAX_WORKERS = 6
 
 #Generated with the help of AI
 
@@ -54,27 +57,27 @@ def generate_plots(sim_id, batch_folder):
     with open(info_path, "r") as f:
         content = f.read()
         min_dist_match = re.search(r'Minimum Ship Distance:\s*([0-9]+)', content)
-        vel_match = re.search(r'Final Ship Velocity:\s*([0-9]+)', content)
+        dv_match = re.search(r'Delta Ship Velocity:\s*([-+]?[0-9]+)', content)
         
         min_dist = min_dist_match.group(1) if min_dist_match else "Unknown"
-        vel = vel_match.group(1) if vel_match else "Unknown"
+        delta_v = dv_match.group(1) if dv_match else "Unknown"
         
     # Rename the folder to include the minimum distance and velocity
     min_dist_val = float(min_dist) / 1000.0 if min_dist != "Unknown" else "Unknown"
-    new_folder_name = f"sim_{sim_id}_V{vel}_D{min_dist_val}"
+    new_folder_name = f"sim_{sim_id}_dV{delta_v}_D{min_dist_val}"
     output_folder = os.path.join(batch_folder, new_folder_name)
     os.rename(old_output_folder, output_folder)
     
     bin_path = os.path.join(output_folder, f"simulation_data_{sim_id}.bin")
         
-    # Load the flat binary array and reshape into 11 columns
-    data = np.fromfile(bin_path, dtype=np.float64).reshape(-1, 11)
+    # Load the flat binary array and reshape into 15 columns
+    data = np.fromfile(bin_path, dtype=np.float64).reshape(-1, 15)
     
     time_days = data[:, 0]
     energy = data[:, 1]
     ship_energy = data[:, 2]
-    # Reshape the remaining 8 columns into shape (steps, 4 bodies, 2 dimensions [x, y])
-    history = data[:, 3:].reshape(-1, 4, 2)
+    # Reshape the remaining 12 columns into shape (steps, 4 bodies, 3 dimensions [x, y, z])
+    history = data[:, 3:].reshape(-1, 4, 3)
     
     # Target max 10,000 points for static plots to render instantly
     plot_skip = max(1, len(time_days) // 10000)
@@ -83,26 +86,36 @@ def generate_plots(sim_id, batch_folder):
     colors = ['purple', 'gold', 'orange', 'blue']
     
     # =========================================
-    # 1. 2D Trajectories Plot
+    # 1. 3D Trajectories Plot
     # =========================================
-    fig, ax = plt.subplots(figsize=(10, 10))
+    plotter = pv.Plotter(window_size=[1000, 1000], off_screen=True)
+    plotter.enable_anti_aliasing('msaa')
+    plotter.set_background('white')
+    max_val = np.max(np.abs(history)) * 1.1
+    bounds_mesh = pv.Box(bounds=(-max_val, max_val, -max_val, max_val, -max_val, max_val))
+    plotter.add_mesh(bounds_mesh, style='wireframe', color='lightgray', opacity=0.3)
+    
     for i, name in enumerate(body_names):
-        x, y = history[::plot_skip, i, 0], history[::plot_skip, i, 1]
-        style = '--' if name == "Ship" else '-'
-        width = 1.0 if name == "Ship" else 2.0
+        x, y, z = history[::plot_skip, i, 0], history[::plot_skip, i, 1], history[::plot_skip, i, 2]
+        pts = np.column_stack((x, y, z))
+        if len(pts) > 1:
+            line = pv.PolyData(pts)
+            line.lines = np.hstack([[len(pts)], np.arange(len(pts))])
+            width = 1 if name == "Ship" else 2
+            plotter.add_mesh(line, color=colors[i], line_width=width, label=name)
+            
+        plotter.add_mesh(pv.Sphere(radius=max_val*0.015, center=pts[-1], theta_resolution=40, phi_resolution=40), color=colors[i])
         
-        ax.plot(x, y, color=colors[i], linestyle=style, linewidth=width, label=name, alpha=0.8)
-        ax.plot(history[-1, i, 0], history[-1, i, 1], marker='o', color=colors[i], markersize=6) # Exact end position
-        ax.plot(history[0, i, 0], history[0, i, 1], marker='.', color=colors[i], markersize=3)   # Exact start position
-        
-    ax.set_aspect('equal')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    ax.set_title(f"Simulation {sim_id} - Orbital Trajectories")
-    ax.set_xlabel('X Position (m)')
-    ax.set_ylabel('Y Position (m)')
-    plt.savefig(os.path.join(output_folder, f"orbit_plot_{sim_id}.png"), dpi=300, bbox_inches='tight')
-    plt.close(fig)
+    plotter.add_legend()
+    plotter.add_axes()
+    plotter.camera_position = 'iso'
+    plotter.camera.zoom(1.3)
+    
+    # Save the static PNG
+    plotter.screenshot(os.path.join(output_folder, f"orbit_plot_{sim_id}.png"))
+    # Export an interactive HTML file that you can open in any browser!
+    plotter.export_html(os.path.join(output_folder, f"interactive_orbit_{sim_id}.html"))
+    plotter.close()
     
     # =========================================
     # 2. Total Energy Stability
@@ -130,41 +143,51 @@ def generate_plots(sim_id, batch_folder):
     plt.close(fig)
     
     # =========================================
-    # 4. Animated GIF
+    # 4. Animated MP4 Video
     # =========================================
-    # Dynamically target ~200 frames to prevent massive slowdowns on high-precision runs
-    skip = max(1, len(time_days) // 200)
-    fig, ax = plt.subplots(figsize=(8, 8))
-    max_val = np.max(np.abs(history[:, :, :])) * 1.1 # Dynamically scale bounds to fit all bodies
-    ax.set_xlim(-max_val, max_val)
-    ax.set_ylim(-max_val, max_val)
-    ax.set_aspect('equal')
-    ax.grid(True, alpha=0.3)
-    ax.set_title(f"Simulation {sim_id} Animation")
+    # Dynamically target ~400 total frames for a smooth ~13-second video
+    skip = max(1, len(time_days) // 400)
+    plotter = pv.Plotter(window_size=[800, 800], off_screen=True)
+    plotter.set_background('white')
+    plotter.add_mesh(bounds_mesh, style='wireframe', color='lightgray', opacity=0.3)
+    plotter.add_axes()
+    plotter.camera_position = 'iso'
+    plotter.camera.zoom(1.3)
     
-    lines, heads = [], []
-    for i, name in enumerate(body_names):
-        style = '--' if name == "Ship" else '-'
-        line, = ax.plot([], [], color=colors[i], linestyle=style, alpha=0.6, linewidth=1, label=name)
-        head, = ax.plot([], [], marker='o', color=colors[i], markersize=6)
-        lines.append(line); heads.append(head)
-        
-    ax.legend(loc="upper right")
-    time_text = ax.text(0.02, 0.95, '', transform=ax.transAxes)
+    plotter.open_movie(os.path.join(output_folder, f"animation_{sim_id}.mp4"), framerate=30)
     
-    def update(frame):
-        idx = min(frame * skip, len(time_days) - 1)
-        time_text.set_text(f"Time: {time_days[idx]:.1f} days")
-        for i in range(4):
-            lines[i].set_data(history[:idx, i, 0], history[:idx, i, 1])
-            if idx > 0:
-                heads[i].set_data([history[idx, i, 0]], [history[idx, i, 1]])
-        return lines + heads + [time_text]
-        
     frames = len(time_days) // skip
-    ani = FuncAnimation(fig, update, frames=frames, interval=30, blit=True)
-    ani.save(os.path.join(output_folder, f"animation_{sim_id}.gif"), writer=PillowWriter(fps=30))
-    plt.close(fig)
+    for frame in range(frames):
+        if frame % max(1, frames // 10) == 0:
+            if sim_id == 67: 
+                print(f"SIX SEVEN, SIX SEVEN")
+            
+            print(f"  -> Sim {sim_id}: Rendering MP4 video... {frame/frames*100:.0f}%", flush=True)
+
+        idx = min(frame * skip, len(time_days) - 1)
+        
+        plotter.add_text(f"Simulation {sim_id} Animation\nTime: {time_days[idx]:.1f} days", name="time_text", font_size=12, color='black')
+        
+        for i, name in enumerate(body_names):
+            # Apply the exact same `skip` to the line trail. 
+            # This completely decouples rendering time from the simulation resolution!
+            pts = history[0:idx+1:skip, i, :]
+            
+            # Guarantee the trail perfectly connects to the current head position
+            if len(pts) > 0 and not np.array_equal(pts[-1], history[idx, i, :]):
+                pts = np.vstack([pts, history[idx, i, :]])
+                
+            if len(pts) > 1:
+                line = pv.PolyData(pts)
+                line.lines = np.hstack([[len(pts)], np.arange(len(pts))])
+                width = 1 if name == "Ship" else 2
+                plotter.add_mesh(line, name=f"line_{i}", color=colors[i], line_width=width)
+            # Use a low-poly sphere for the animation (massively speeds up geometry generation)
+            plotter.add_mesh(pv.Sphere(radius=max_val*0.015, center=history[idx, i, :], theta_resolution=16, phi_resolution=16), name=f"head_{i}", color=colors[i])
+            
+        plotter.write_frame()
+        
+    plotter.close()
 
 if __name__ == "__main__":
     # 1. Compile, setup folders, and execute C engine
@@ -172,11 +195,15 @@ if __name__ == "__main__":
     
     # 2. Generate plots for every simulation run
     count = 0
-    with ProcessPoolExecutor() as executor:
-        futures = [executor.submit(generate_plots, sim, batch_folder) for sim in range(1, total_simulations_run + 1)]
-        for _ in as_completed(futures):
+    with ProcessPoolExecutor(MAX_WORKERS) as executor:
+        futures = {executor.submit(generate_plots, sim, batch_folder): sim for sim in range(1, total_simulations_run + 1)}
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                print(f"\n[ERROR in Sim {futures[future]}] Plot generation failed: {e}")
             count += 1
-            print(f"\r[{count/total_simulations_run*100:3.0f}%] Generating plots...", end="", flush=True)
+            print(f"[{count/total_simulations_run*100:3.0f}%] Completed full rendering pipeline for Sim {futures[future]}!", flush=True)
         
     # Clean up the temp file
     if os.path.exists("batch_path.txt"):

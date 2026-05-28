@@ -8,15 +8,17 @@ int main() {
     int skip = 100;
     int fps = 80;
     
-    double min_v_phase = -0.005;
-    double max_v_phase = 0.005;
+    double min_v_phase = -0.0032;
+    double max_v_phase = -0.0035;
     double min_ship_vel = 25.201667e3;
     double max_ship_vel = 25.201667e3;
     
-    double total_t = 600.0;//days
-    double factor = 0.06;//lower values => more precision
-    double precision_factor = 10.0;//will divite dt by it when closer than 1e9km
-    int total_sims = 100;
+    double total_t = 1200.0;//days
+    double factor = 0.001;//lower values => more precision
+    double precision_factor = 250.0;//will divite dt by it when closer than 1e9km
+    double max_dt = 100;
+    double min_dt = 0.001;
+    int total_sims = 20;
 
 
 
@@ -34,6 +36,7 @@ int main() {
     //=======================================
     time_t start_time = time(NULL);
     int completed = 0;
+    int valid_completed = 0;
 
     //read .txt from python
     char base_folder[MAX_CHAR] = "simulation_results";
@@ -49,15 +52,26 @@ int main() {
         char current_output_folder[MAX_CHAR * 2];
         snprintf(current_output_folder, sizeof(current_output_folder), "%s/sim_%d", base_folder, i+1);
 
-        RunSimulation(current_output_folder, venus_phases[i], ship_velocities[i], total_t, factor, i, skip, fps, precision_factor);
+        int status = RunSimulation(current_output_folder, venus_phases[i], ship_velocities[i], total_t, factor, i, skip, fps, precision_factor, max_dt, min_dt);
 
         #pragma omp critical 
         {
             completed++;
+            if (status == 1) {
+                valid_completed++;
+            }
+            
             double completion = (completed*100.0)/total_sims;
             time_t current_time = time(NULL);
             double elapsed = difftime(current_time, start_time);
-            double eta = (elapsed/completed)*(total_sims-completed);
+            
+            //Exclude collisions from counting towards ETA
+            double eta = 0.0;
+            if (valid_completed > 0) {
+                double time_per_valid = elapsed/valid_completed;
+                eta = time_per_valid*(total_sims-completed);
+            }
+            
             printf("[%3.0f%%] ETA: %02dm %02ds | Completed Sim ID %d / %d\n", completion, ((int)eta)/60, ((int)eta)%60, i+1, total_sims);
         }
     }
