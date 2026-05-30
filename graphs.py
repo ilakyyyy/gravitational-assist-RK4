@@ -58,13 +58,20 @@ def generate_plots(sim_id, batch_folder):
         content = f.read()
         min_dist_match = re.search(r'Minimum Ship Distance:\s*([0-9]+)', content)
         dv_match = re.search(r'Delta Ship Velocity:\s*([-+]?[0-9]+)', content)
+        de_match = re.search(r'Delta Ship Energy:\s*([-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)', content)
+        vp_match = re.search(r'Venus Phase:\s*([-+]?[0-9]*\.?[0-9]+)', content)
         
         min_dist = min_dist_match.group(1) if min_dist_match else "Unknown"
         delta_v = dv_match.group(1) if dv_match else "Unknown"
+        delta_e = de_match.group(1) if de_match else "Unknown"
+        v_phase = vp_match.group(1) if vp_match else "Unknown"
         
-    # Rename the folder to include the minimum distance and velocity
+    # Rename the folder to include the stats
     min_dist_val = float(min_dist) / 1000.0 if min_dist != "Unknown" else "Unknown"
-    new_folder_name = f"sim_{sim_id}_dV{delta_v}_D{min_dist_val}"
+    delta_e_str = f"{float(delta_e):.2e}" if delta_e != "Unknown" else "Unknown"
+    v_phase_str = f"{float(v_phase):.4f}" if v_phase != "Unknown" else "Unknown"
+    
+    new_folder_name = f"sim_{sim_id}_dV{delta_v}_D{min_dist_val}_dE{delta_e_str}_Vp{v_phase_str}"
     output_folder = os.path.join(batch_folder, new_folder_name)
     os.rename(old_output_folder, output_folder)
     
@@ -76,14 +83,14 @@ def generate_plots(sim_id, batch_folder):
     time_days = data[:, 0]
     energy = data[:, 1]
     ship_energy = data[:, 2]
-    # Reshape the remaining 12 columns into shape (steps, 4 bodies, 3 dimensions [x, y, z])
-    history = data[:, 3:].reshape(-1, 4, 3)
+    # Reshape the remaining columns into shape (steps, 6 bodies, 3 dimensions [x, y, z])
+    history = data[:, 3:].reshape(-1, 6, 3)
     
     # Target max 10,000 points for static plots to render instantly
     plot_skip = max(1, len(time_days) // 10000)
     
-    body_names = ["Ship", "Sun", "Venus", "Earth"]
-    colors = ['purple', 'gold', 'orange', 'blue']
+    body_names = ["Ship", "Sun", "Venus", "Earth", "Moon", "Jupiter"]
+    colors = ['purple', 'gold', 'orange', 'blue', 'gray', 'brown']
     
     # =========================================
     # 1. 3D Trajectories Plot
@@ -188,6 +195,72 @@ def generate_plots(sim_id, batch_folder):
         plotter.write_frame()
         
     plotter.close()
+
+    # =========================================
+    # 5. Venus-Centered Flyby Animated MP4
+    # =========================================
+    # 1. Shift everything so Venus is always at (0, 0, 0)
+    venus_pos = history[:, 2, :].copy()
+    centered_history = history.copy()
+    for i in range(len(body_names)):
+        centered_history[:, i, :] -= venus_pos
+
+    # 2. Find the moment of closest approach (flyby)
+    ship_pos = centered_history[:, 0, :]
+    dists = np.linalg.norm(ship_pos, axis=1)
+    min_dist_idx = np.argmin(dists)
+    flyby_time = time_days[min_dist_idx]
+
+    # 3. Restrict data to a small window around the flyby (2 days before/after)
+    window_days = 2  
+    start_idx = np.searchsorted(time_days, flyby_time - window_days)
+    end_idx = np.searchsorted(time_days, flyby_time + window_days)
+
+    if start_idx >= end_idx:
+        start_idx = max(0, min_dist_idx - 1000)
+        end_idx = min(len(time_days)-1, min_dist_idx + 1000)
+
+    flyby_history = centered_history[start_idx:end_idx]
+    flyby_time_days = time_days[start_idx:end_idx]
+
+    # 4. Generate the Centered MP4
+    flyby_skip = max(1, len(flyby_time_days) // 300) # ~10s video at 30 fps
+    
+    plotter_flyby = pv.Plotter(window_size=[800, 800], off_screen=True)
+    plotter_flyby.set_background('white')
+    
+    # Set bounds to comfortably fit the ship during flyby
+    flyby_max_val = np.max(np.abs(flyby_history[:, 0, :])) * 1.2 
+    flyby_bounds_mesh = pv.Box(bounds=(-flyby_max_val, flyby_max_val, -flyby_max_val, flyby_max_val, -flyby_max_val, flyby_max_val))
+    plotter_flyby.add_mesh(flyby_bounds_mesh, style='wireframe', color='lightgray', opacity=0.3)
+    plotter_flyby.add_axes()
+    plotter_flyby.camera_position = 'iso'
+    
+    plotter_flyby.open_movie(os.path.join(output_folder, f"venus_flyby_centered_{sim_id}.mp4"), framerate=30)
+
+    flyby_frames = len(flyby_time_days) // flyby_skip
+    
+    for frame in range(flyby_frames):
+        idx = min(frame * flyby_skip, len(flyby_time_days) - 1)
+        plotter_flyby.add_text(f"Sim {sim_id} Venus Flyby\nTime: {flyby_time_days[idx]:.2f} days", name="time_text", font_size=12, color='black')
+        
+        for i, name in enumerate(body_names):
+            pts = flyby_history[0:idx+1:flyby_skip, i, :]
+            
+            if len(pts) > 0 and not np.array_equal(pts[-1], flyby_history[idx, i, :]):
+                pts = np.vstack([pts, flyby_history[idx, i, :]])
+                
+            if len(pts) > 1:
+                line = pv.PolyData(pts)
+                line.lines = np.hstack([[len(pts)], np.arange(len(pts))])
+                width = 1 if name == "Ship" else 2
+                plotter_flyby.add_mesh(line, name=f"line_{i}", color=colors[i], line_width=width)
+                
+            plotter_flyby.add_mesh(pv.Sphere(radius=flyby_max_val*0.02, center=flyby_history[idx, i, :], theta_resolution=16, phi_resolution=16), name=f"head_{i}", color=colors[i])
+            
+        plotter_flyby.write_frame()
+        
+    plotter_flyby.close()
 
 if __name__ == "__main__":
     # 1. Compile, setup folders, and execute C engine

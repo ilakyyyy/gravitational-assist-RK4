@@ -13,3 +13,13 @@ batch_path.txt
 # (Optional) Python cache if you ever import modules
 __pycache__/
 *.pyc
+
+# LaTeX:
+*.sty
+*.fls
+*.aux
+*.fdb_latexmk
+*.log
+*.out
+*.toc
+*.synctex.gz

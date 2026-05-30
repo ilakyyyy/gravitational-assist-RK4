@@ -68,17 +68,27 @@ int sim_id, int skip, int fps, double precision_factor, double max_dt, double mi
     double phase_rad = initial_v_ph * (PI / 180.0);
     double Venus_R0_X = VENUS_R0_P_X * cos(phase_rad);
     double Venus_R0_Y = VENUS_R0_P_X * sin(phase_rad);
-    double Venus_R0_Z = VENUS_R0_P_Z;
+    double Venus_R0_Z = 0;
     double Venus_V0_X = VENUS_V0_P_Y * -sin(phase_rad);
     double Venus_V0_Y = VENUS_V0_P_Y * cos(phase_rad);
-    double Venus_V0_Z = VENUS_V0_P_Z;
+    double Venus_V0_Z = 0;
+    
+    //Orbital inclination (tilt around x-axis)
+    double incl_rad = VENUS_INCLINATION * (PI / 180.0);
+    Venus_R0_Z = Venus_R0_Y*sin(incl_rad);
+    Venus_R0_Y = Venus_R0_Y*cos(incl_rad);
+    
+    Venus_V0_Z = Venus_V0_Y*sin(incl_rad);
+    Venus_V0_Y = Venus_V0_Y*cos(incl_rad);
 
     //Initialize bodies array
     Body bodies[N_BODIES] = {
         [SHIP_INDEX]  = {"Ship",  SHIP_MASS,  {SHIP_R0_X, SHIP_R0_Y, SHIP_R0_Z},   {0.0, 0.0, 0.0}},
         [SUN_INDEX]   = {"Sun",   SUN_MASS,   {SUN_R0_X, SUN_R0_Y, SUN_R0_Z},     {SUN_V0_X, SUN_V0_Y, SUN_V0_Z}},
         [VENUS_INDEX] = {"Venus", VENUS_MASS, {0.0, 0.0, 0.0},               {0.0, 0.0, 0.0}},
-        [EARTH_INDEX] = {"Earth", EARTH_MASS, {EARTH_R0_X, EARTH_R0_Y, EARTH_R0_Z}, {EARTH_V0_X, EARTH_V0_Y, EARTH_V0_Z}}
+        [EARTH_INDEX] = {"Earth", EARTH_MASS, {EARTH_R0_X, EARTH_R0_Y, EARTH_R0_Z}, {EARTH_V0_X, EARTH_V0_Y, EARTH_V0_Z}},
+        [MOON_INDEX]  = {"Moon",  MOON_MASS,  {MOON_R0_X, MOON_R0_Y, MOON_R0_Z},   {MOON_V0_X, MOON_V0_Y, MOON_V0_Z}},
+        [JUPITER_INDEX]={"Jupiter",JUPITER_MASS,{JUPITER_R0_X, JUPITER_R0_Y, JUPITER_R0_Z},{JUPITER_V0_X, JUPITER_V0_Y, JUPITER_V0_Z}}
     };
     
     //Assign the variables generated dynamically so as to keep the compiler happy
@@ -89,12 +99,12 @@ int sim_id, int skip, int fps, double precision_factor, double max_dt, double mi
     bodies[VENUS_INDEX].vel[0] = Venus_V0_X;
     bodies[VENUS_INDEX].vel[1] = Venus_V0_Y;
     bodies[VENUS_INDEX].vel[2] = Venus_V0_Z;
-
+    
     double sim_time = 0.0, dt;
     double max_time = total_time * 24.0 * 3600.0;
     double min_distance = 1e30; //Initialize to a very large number
     
-    // Prepare output file paths
+    //Prepare output file paths
     char bin_filename[256];
     char txt_filename[256];
     snprintf(bin_filename, sizeof(bin_filename), "%s/simulation_data_%d.bin", output_folder, sim_id+1);
@@ -127,7 +137,7 @@ int sim_id, int skip, int fps, double precision_factor, double max_dt, double mi
             min_distance = venus_dist;
         }
 
-        if (venus_dist <= COLLISION_DISTANCE) {
+        if (min_distance <= COLLISION_DISTANCE) {
             fclose(bin_file);
             remove(bin_filename);
             
@@ -178,8 +188,8 @@ int sim_id, int skip, int fps, double precision_factor, double max_dt, double mi
     double final_energy_error = (final_energy - initial_energy)/fabs(initial_energy);
     
     fprintf(txt_file, "SIMULATION REPORT - ID %d\n=======================================\n\n", sim_id + 1);
-    fprintf(txt_file, "Initial conditions:\n  Venus Phase:       %f degrees\n  Ship Velocity:     %f m/s\n  Bodies:            ['Ship', 'Sun', 'Venus', 'Earth']\n\n", initial_v_ph, initial_ship_v);
-    fprintf(txt_file, "Time settings:\n  Total Steps:       %ld\n\nPerformance:\n  Factor:            %f\n  Precision Factor:  %f\n  Relative Energy Error: %.5e\n  Final Ship Velocity:   %.0f m/s\n  Delta Ship Velocity:   %.0f m/s\n  Delta Ship Energy:     %.5e J\n  Minimum Ship Distance: %.0f m\n", steps, factor, precision_factor, final_energy_error, final_ship_v, delta_v, delta_ship_energy, min_distance);
+    fprintf(txt_file, "Initial conditions:\n  Venus Phase:       %f degrees\n  Ship Velocity:     %f m/s\n  Bodies:            ['Ship', 'Sun', 'Venus', 'Earth', 'Moon', 'Jupiter']\n\n", initial_v_ph, initial_ship_v);
+    fprintf(txt_file, "Time settings:\n  Total Steps:       %ld\n\nPerformance:\n  Factor:            %f\n  Precision Factor:  %f   Max dt: %f\n    Min dt: %f\n  Relative Energy Error: %.5e\n  Final Ship Velocity:   %.0f m/s\n  Delta Ship Velocity:   %.0f m/s\n  Delta Ship Energy:     %.5e J\n  Minimum Ship Distance: %.0f m\n", steps, factor, precision_factor, max_dt, min_dt, final_energy_error, final_ship_v, delta_v, delta_ship_energy, min_distance);
     fclose(txt_file);
 
     return 1;

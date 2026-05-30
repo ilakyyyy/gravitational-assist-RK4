@@ -14,9 +14,9 @@ int main() {
     double max_ship_vel = 25.201667e3;
     
     double total_t = 1200.0;//days
-    double factor = 0.001;//lower values => more precision
-    double precision_factor = 250.0;//will divite dt by it when closer than 1e9km
-    double max_dt = 100;
+    double factor = 0.005;//lower values => more precision
+    double precision_factor = 80.0;//will divite dt by it when closer than 1e9km
+    double max_dt = 10;
     double min_dt = 0.001;
     int total_sims = 20;
 
