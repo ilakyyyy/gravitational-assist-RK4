@@ -20,7 +20,7 @@
 
 //Venus - perihelion data:
 #define VENUS_RADIUS 6.052e6
-#define COLLISION_DISTANCE 6.152e6 //Venus radius(6052km)+Atmosphere(let's make it ~100 km so as to not lose any energy to drag)
+#define COLLISION_DISTANCE 6.402e6 //Venus radius(6052km)+Atmosphere
 #define VENUS_MASS 4.8673058e24
 #define VENUS_R0_P_X 1.0748e11
 #define VENUS_R0_P_Y 0.0
@@ -100,8 +100,8 @@ double CalculateHamiltonian(Body* bodies, int n);
 double ShipHamiltonian(Body* bodies, int n);
 double MinimumDistance(Body* bodies, int index);
 void CalculateSweep(double min, double max, double* sweep, int n);
-int RunSimulation(char* output_folder, double initial_v_ph, double initial_ship_v, double total_time, double factor, 
-int sim_id, int skip, int fps, double precision_factor, double max_dt, double min_dt);
+int RunSimulation(char* output_folder, double launch_angle, double pitch_angle, double initial_ship_v, double total_time, double factor, 
+int sim_id, int skip, int fps, double precision_factor, double max_dt, double min_dt, double ephem[6][6]);
 
 //RK4integrator.c
 void GravityEngine(double dt, Body* bodies, int n);

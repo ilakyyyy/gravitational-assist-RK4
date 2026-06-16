@@ -11,7 +11,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import pyvista as pv
 import multiprocessing
 
-MAX_WORKERS = 6
+MAX_WORKERS = 8
 
 #Generated with the help of AI
 
@@ -25,9 +25,15 @@ def compile_and_run_c():
         
     # Dynamically find 'total_sims' from the C source code
     with open("simulation.c", "r") as f:
-        match = re.search(r'int\s+total_sims\s*=\s*(\d+);', f.read())
-        total_sims = int(match.group(1)) if match else 1
+        content = f.read()
+        match_yaw = re.search(r'int\s+yaw_sims\s*=\s*(\d+);', content)
+        match_pitch = re.search(r'int\s+pitch_sims\s*=\s*(\d+);', content)
         
+        if match_yaw and match_pitch:
+            total_sims = int(match_yaw.group(1)) * int(match_pitch.group(1))
+        else:
+            match_total = re.search(r'int\s+total_sims\s*=\s*(\d+);', content)
+            total_sims = int(match_total.group(1)) if match_total else 1
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     batch_folder = f"simulation_results/Batch_{timestamp}"
@@ -59,26 +65,30 @@ def generate_plots(sim_id, batch_folder):
         min_dist_match = re.search(r'Minimum Ship Distance:\s*([0-9]+)', content)
         dv_match = re.search(r'Delta Ship Velocity:\s*([-+]?[0-9]+)', content)
         de_match = re.search(r'Delta Ship Energy:\s*([-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)', content)
-        vp_match = re.search(r'Venus Phase:\s*([-+]?[0-9]*\.?[0-9]+)', content)
+        vp_match = re.search(r'Launch Angle:\s*([-+]?[0-9]*\.?[0-9]+)', content)
+        pt_match = re.search(r'Pitch Angle:\s*([-+]?[0-9]*\.?[0-9]+)', content)
         
         min_dist = min_dist_match.group(1) if min_dist_match else "Unknown"
         delta_v = dv_match.group(1) if dv_match else "Unknown"
         delta_e = de_match.group(1) if de_match else "Unknown"
-        v_phase = vp_match.group(1) if vp_match else "Unknown"
+        l_angle = vp_match.group(1) if vp_match else "Unknown"
+        p_angle = pt_match.group(1) if pt_match else "Unknown"
         
     # Rename the folder to include the stats
     min_dist_val = float(min_dist) / 1000.0 if min_dist != "Unknown" else "Unknown"
+    dist_str = f"{min_dist_val:014.3f}" if min_dist_val != "Unknown" else "Unknown"
     delta_e_str = f"{float(delta_e):.2e}" if delta_e != "Unknown" else "Unknown"
-    v_phase_str = f"{float(v_phase):.4f}" if v_phase != "Unknown" else "Unknown"
+    l_angle_str = f"{float(l_angle):.4f}" if l_angle != "Unknown" else "Unknown"
+    p_angle_str = f"{float(p_angle):.4f}" if p_angle != "Unknown" else "Unknown"
     
-    new_folder_name = f"sim_{sim_id}_dV{delta_v}_D{min_dist_val}_dE{delta_e_str}_Vp{v_phase_str}"
+    new_folder_name = f"D{dist_str}_dE{delta_e_str}_A{l_angle_str}_P{p_angle_str}_sim_{sim_id}"
     output_folder = os.path.join(batch_folder, new_folder_name)
     os.rename(old_output_folder, output_folder)
     
     bin_path = os.path.join(output_folder, f"simulation_data_{sim_id}.bin")
         
-    # Load the flat binary array and reshape into 15 columns
-    data = np.fromfile(bin_path, dtype=np.float64).reshape(-1, 15)
+    # Load the flat binary array and reshape into 21 columns (3 info + 6 bodies * 3 dims)
+    data = np.fromfile(bin_path, dtype=np.float64).reshape(-1, 21)
     
     time_days = data[:, 0]
     energy = data[:, 1]
@@ -92,6 +102,18 @@ def generate_plots(sim_id, batch_folder):
     body_names = ["Ship", "Sun", "Venus", "Earth", "Moon", "Jupiter"]
     colors = ['purple', 'gold', 'orange', 'blue', 'gray', 'brown']
     
+    # Real-world radii in meters
+    true_radii = [
+        1.0e8,       # Ship (artificial visible dot)
+        6.957e8,     # Sun
+        6.052e6,     # Venus
+        6.378e6,     # Earth
+        1.7375e6,    # Moon
+        7.1492e7     # Jupiter
+    ]
+
+    venus_radius = true_radii[2]
+
     # =========================================
     # 1. 3D Trajectories Plot
     # =========================================
@@ -102,6 +124,9 @@ def generate_plots(sim_id, batch_folder):
     bounds_mesh = pv.Box(bounds=(-max_val, max_val, -max_val, max_val, -max_val, max_val))
     plotter.add_mesh(bounds_mesh, style='wireframe', color='lightgray', opacity=0.3)
     
+    # Dynamic radii that respects real proportions but guarantees a visible minimum size
+    plot_radii = [max(r * 25, max_val * 0.0015) for r in true_radii]
+    
     for i, name in enumerate(body_names):
         x, y, z = history[::plot_skip, i, 0], history[::plot_skip, i, 1], history[::plot_skip, i, 2]
         pts = np.column_stack((x, y, z))
@@ -111,7 +136,7 @@ def generate_plots(sim_id, batch_folder):
             width = 1 if name == "Ship" else 2
             plotter.add_mesh(line, color=colors[i], line_width=width, label=name)
             
-        plotter.add_mesh(pv.Sphere(radius=max_val*0.015, center=pts[-1], theta_resolution=40, phi_resolution=40), color=colors[i])
+        plotter.add_mesh(pv.Sphere(radius=plot_radii[i], center=pts[-1], theta_resolution=40, phi_resolution=40), color=colors[i])
         
     plotter.add_legend()
     plotter.add_axes()
@@ -190,7 +215,7 @@ def generate_plots(sim_id, batch_folder):
                 width = 1 if name == "Ship" else 2
                 plotter.add_mesh(line, name=f"line_{i}", color=colors[i], line_width=width)
             # Use a low-poly sphere for the animation (massively speeds up geometry generation)
-            plotter.add_mesh(pv.Sphere(radius=max_val*0.015, center=history[idx, i, :], theta_resolution=16, phi_resolution=16), name=f"head_{i}", color=colors[i])
+            plotter.add_mesh(pv.Sphere(radius=plot_radii[i], center=history[idx, i, :], theta_resolution=16, phi_resolution=16), name=f"head_{i}", color=colors[i])
             
         plotter.write_frame()
         
@@ -229,10 +254,17 @@ def generate_plots(sim_id, batch_folder):
     plotter_flyby = pv.Plotter(window_size=[800, 800], off_screen=True)
     plotter_flyby.set_background('white')
     
-    # Set bounds to comfortably fit the ship during flyby
-    flyby_max_val = np.max(np.abs(flyby_history[:, 0, :])) * 1.2 
+    # Set the view to be the minimum distance plus a margin of 2 Venus radii for a tight zoom.
+    flyby_max_val = float(min_dist) + (venus_radius * 2)
+
     flyby_bounds_mesh = pv.Box(bounds=(-flyby_max_val, flyby_max_val, -flyby_max_val, flyby_max_val, -flyby_max_val, flyby_max_val))
     plotter_flyby.add_mesh(flyby_bounds_mesh, style='wireframe', color='lightgray', opacity=0.3)
+    
+    # Venus flyby is zoomed in, so we can use much closer-to-reality scales
+    flyby_radii = [max(r * 2, flyby_max_val * 0.002) for r in true_radii] # Default sizes
+    flyby_radii[2] = venus_radius / 2.0 # Make Venus visually smaller to better see the trajectory
+    flyby_radii[0] = flyby_max_val * 0.005 # Make the ship a very small point
+
     plotter_flyby.add_axes()
     plotter_flyby.camera_position = 'iso'
     
@@ -256,14 +288,38 @@ def generate_plots(sim_id, batch_folder):
                 width = 1 if name == "Ship" else 2
                 plotter_flyby.add_mesh(line, name=f"line_{i}", color=colors[i], line_width=width)
                 
-            plotter_flyby.add_mesh(pv.Sphere(radius=flyby_max_val*0.02, center=flyby_history[idx, i, :], theta_resolution=16, phi_resolution=16), name=f"head_{i}", color=colors[i])
+            plotter_flyby.add_mesh(pv.Sphere(radius=flyby_radii[i], center=flyby_history[idx, i, :], theta_resolution=16, phi_resolution=16), name=f"head_{i}", color=colors[i])
             
         plotter_flyby.write_frame()
         
     plotter_flyby.close()
 
+    # =========================================
+    # 6. Venus-Centered Flyby Static PNG
+    # =========================================
+    static_flyby_plotter = pv.Plotter(window_size=[800, 800], off_screen=True)
+    static_flyby_plotter.set_background('white')
+    static_flyby_plotter.add_mesh(flyby_bounds_mesh, style='wireframe', color='lightgray', opacity=0.3)
+    static_flyby_plotter.add_axes()
+    static_flyby_plotter.camera_position = 'iso'
+
+    # Add Venus sphere at a visually smaller radius to match the video
+    static_flyby_plotter.add_mesh(pv.Sphere(radius=venus_radius / 2.0, center=[0,0,0], theta_resolution=40, phi_resolution=40), color=colors[2])
+
+    # Add the full ship trajectory line for the flyby
+    flyby_pts = flyby_history[:, 0, :]
+    if len(flyby_pts) > 1:
+        flyby_line = pv.PolyData(flyby_pts)
+        flyby_line.lines = np.hstack([[len(flyby_pts)], np.arange(len(flyby_pts))])
+        static_flyby_plotter.add_mesh(flyby_line, color='purple', line_width=2)
+
+    static_flyby_plotter.add_text(f"Sim {sim_id} Venus Flyby Trajectory", name="title_text", font_size=12, color='black')
+    static_flyby_plotter.screenshot(os.path.join(output_folder, f"venus_flyby_static_{sim_id}.png"))
+    static_flyby_plotter.close()
+
 if __name__ == "__main__":
     # 1. Compile, setup folders, and execute C engine
+    print("Compiling and running sims...")
     total_simulations_run, batch_folder = compile_and_run_c()
     
     # 2. Generate plots for every simulation run
@@ -281,5 +337,5 @@ if __name__ == "__main__":
     # Clean up the temp file
     if os.path.exists("batch_path.txt"):
         os.remove("batch_path.txt")
-        
+
     print("\n[SUCCESS] Entire pipeline completed.")

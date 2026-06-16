@@ -62,43 +62,48 @@ void CalculateSweep(double min, double max, double* sweep, int n) {
     for(int i=0; i<n; i++) *(sweep+i) = min+step*i;
 }
 
-int RunSimulation(char* output_folder, double initial_v_ph, double initial_ship_v, double total_time, double factor, 
-int sim_id, int skip, int fps, double precision_factor, double max_dt, double min_dt) {
-    //Convert phase to radians
-    double phase_rad = initial_v_ph * (PI / 180.0);
-    double Venus_R0_X = VENUS_R0_P_X * cos(phase_rad);
-    double Venus_R0_Y = VENUS_R0_P_X * sin(phase_rad);
-    double Venus_R0_Z = 0;
-    double Venus_V0_X = VENUS_V0_P_Y * -sin(phase_rad);
-    double Venus_V0_Y = VENUS_V0_P_Y * cos(phase_rad);
-    double Venus_V0_Z = 0;
-    
-    //Orbital inclination (tilt around x-axis)
-    double incl_rad = VENUS_INCLINATION * (PI / 180.0);
-    Venus_R0_Z = Venus_R0_Y*sin(incl_rad);
-    Venus_R0_Y = Venus_R0_Y*cos(incl_rad);
-    
-    Venus_V0_Z = Venus_V0_Y*sin(incl_rad);
-    Venus_V0_Y = Venus_V0_Y*cos(incl_rad);
+int RunSimulation(char* output_folder, double launch_angle, double pitch_angle, double initial_ship_v, double total_time, double factor, 
+int sim_id, int skip, int fps, double precision_factor, double max_dt, double min_dt, double ephem[6][6]) {
+    double e_x = ephem[2][0];
+    double e_y = ephem[2][1];
+    double e_z = ephem[2][2];
 
-    //Initialize bodies array
-    Body bodies[N_BODIES] = {
-        [SHIP_INDEX]  = {"Ship",  SHIP_MASS,  {SHIP_R0_X, SHIP_R0_Y, SHIP_R0_Z},   {0.0, 0.0, 0.0}},
-        [SUN_INDEX]   = {"Sun",   SUN_MASS,   {SUN_R0_X, SUN_R0_Y, SUN_R0_Z},     {SUN_V0_X, SUN_V0_Y, SUN_V0_Z}},
-        [VENUS_INDEX] = {"Venus", VENUS_MASS, {0.0, 0.0, 0.0},               {0.0, 0.0, 0.0}},
-        [EARTH_INDEX] = {"Earth", EARTH_MASS, {EARTH_R0_X, EARTH_R0_Y, EARTH_R0_Z}, {EARTH_V0_X, EARTH_V0_Y, EARTH_V0_Z}},
-        [MOON_INDEX]  = {"Moon",  MOON_MASS,  {MOON_R0_X, MOON_R0_Y, MOON_R0_Z},   {MOON_V0_X, MOON_V0_Y, MOON_V0_Z}},
-        [JUPITER_INDEX]={"Jupiter",JUPITER_MASS,{JUPITER_R0_X, JUPITER_R0_Y, JUPITER_R0_Z},{JUPITER_V0_X, JUPITER_V0_Y, JUPITER_V0_Z}}
-    };
+    double ship_r_x = e_x*(1.0 - 1.0/999.0);
+    double ship_r_y = e_y*(1.0 - 1.0/999.0);
+    double ship_r_z = e_z*(1.0 - 1.0/999.0);
     
-    //Assign the variables generated dynamically so as to keep the compiler happy
-    bodies[SHIP_INDEX].vel[1] = initial_ship_v;
-    bodies[VENUS_INDEX].pos[0] = Venus_R0_X;
-    bodies[VENUS_INDEX].pos[1] = Venus_R0_Y;
-    bodies[VENUS_INDEX].pos[2] = Venus_R0_Z;
-    bodies[VENUS_INDEX].vel[0] = Venus_V0_X;
-    bodies[VENUS_INDEX].vel[1] = Venus_V0_Y;
-    bodies[VENUS_INDEX].vel[2] = Venus_V0_Z;
+    //Base velocity vector aligned with that of Earth
+    double e_v[3];
+    e_v[0] = ephem[2][3];
+    e_v[1] = ephem[2][4];
+    e_v[2] = ephem[2][5];
+    double e_v_norm = norm(e_v, DIM);
+    double base_vx = (e_v[0]/e_v_norm)*initial_ship_v;
+    double base_vy = (e_v[1]/e_v_norm)*initial_ship_v;
+    double base_vz = (e_v[2]/e_v_norm)*initial_ship_v;
+    
+    //Convert base velocity to spherical coords
+    double xy_norm = sqrt(base_vx*base_vx + base_vy*base_vy);
+    double phi = atan2(base_vy, base_vx);
+    double theta = atan2(xy_norm, base_vz);
+    
+    //Yaw and Pitch sweeps
+    double new_phi = phi + launch_angle*(PI/180.0);
+    double new_theta = theta + pitch_angle*(PI/180.0);
+    
+    double ship_v_x = initial_ship_v*sin(new_theta)*cos(new_phi);
+    double ship_v_y = initial_ship_v*sin(new_theta)*sin(new_phi);
+    double ship_v_z = initial_ship_v*cos(new_theta);
+
+    //Ephemeris data initialization
+    Body bodies[N_BODIES] = {
+        [SHIP_INDEX]  = {"Ship",  SHIP_MASS,  {ship_r_x, ship_r_y, ship_r_z}, {ship_v_x, ship_v_y, ship_v_z}},
+        [SUN_INDEX]   = {"Sun",   SUN_MASS,   {ephem[0][0], ephem[0][1], ephem[0][2]}, {ephem[0][3], ephem[0][4], ephem[0][5]}},
+        [VENUS_INDEX] = {"Venus", VENUS_MASS, {ephem[1][0], ephem[1][1], ephem[1][2]}, {ephem[1][3], ephem[1][4], ephem[1][5]}},
+        [EARTH_INDEX] = {"Earth", EARTH_MASS, {ephem[2][0], ephem[2][1], ephem[2][2]}, {ephem[2][3], ephem[2][4], ephem[2][5]}},
+        [MOON_INDEX]  = {"Moon",  MOON_MASS,  {ephem[3][0], ephem[3][1], ephem[3][2]}, {ephem[3][3], ephem[3][4], ephem[3][5]}},
+        [JUPITER_INDEX]={"Jupiter",JUPITER_MASS,{ephem[4][0], ephem[4][1], ephem[4][2]}, {ephem[4][3], ephem[4][4], ephem[4][5]}}
+    };
     
     double sim_time = 0.0, dt;
     double max_time = total_time * 24.0 * 3600.0;
@@ -188,7 +193,7 @@ int sim_id, int skip, int fps, double precision_factor, double max_dt, double mi
     double final_energy_error = (final_energy - initial_energy)/fabs(initial_energy);
     
     fprintf(txt_file, "SIMULATION REPORT - ID %d\n=======================================\n\n", sim_id + 1);
-    fprintf(txt_file, "Initial conditions:\n  Venus Phase:       %f degrees\n  Ship Velocity:     %f m/s\n  Bodies:            ['Ship', 'Sun', 'Venus', 'Earth', 'Moon', 'Jupiter']\n\n", initial_v_ph, initial_ship_v);
+    fprintf(txt_file, "Initial conditions:\n  Launch Angle:      %f degrees\n  Pitch Angle:       %f degrees\n  Ship Velocity:     %f m/s\n  Bodies:            ['Ship', 'Sun', 'Venus', 'Earth', 'Moon', 'Jupiter']\n\n", launch_angle, pitch_angle, initial_ship_v);
     fprintf(txt_file, "Time settings:\n  Total Steps:       %ld\n\nPerformance:\n  Factor:            %f\n  Precision Factor:  %f   Max dt: %f\n    Min dt: %f\n  Relative Energy Error: %.5e\n  Final Ship Velocity:   %.0f m/s\n  Delta Ship Velocity:   %.0f m/s\n  Delta Ship Energy:     %.5e J\n  Minimum Ship Distance: %.0f m\n", steps, factor, precision_factor, max_dt, min_dt, final_energy_error, final_ship_v, delta_v, delta_ship_energy, min_distance);
     fclose(txt_file);
 
