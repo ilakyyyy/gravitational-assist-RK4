@@ -1,0 +1,38 @@
+\section{Conclusiones}
+En este trabajo, se ha abordado el complejo problema de la simulación de una maniobra de asistencia gravitatoria, 
+un pilar fundamental de la astrodinámica moderna; para ello, se ha desarrollado desde cero un 
+simulador del Sistema Solar en C, utilizando un integrador Runge-Kutta de cuarto orden con paso de tiempo adaptativo, 
+lo que ha permitido obtener un equilibrio muy bueno, creo yo, entre precisión numérica y coste computacional.
+
+El objetivo principal, que era encontrar los ángulos de lanzamiento óptimos para que una sonda, 
+con condiciones iniciales inspiradas en la misión Solar Orbiter, maximizara la transferencia de energía con 
+Venus, se ha logrado con éxito; mediante un sistema de barrido de parámetros orquestado por Python y ejecutado por C, 
+se ha podido explorar sistemáticamente el espacio de soluciones, identificando no una, sino dos familias de 
+trayectorias óptimas.
+
+Este proceso de optimización, que se ha llevado a cabo en varias fases, primero con un barrido grueso 
+para mapear todo el espacio de posibilidades, y luego con sucesivos barridos finos de resolución creciente, 
+ha demostrado ser una estrategia muy potente; ha permitido, de hecho, localizar con una precisión de hasta 0.005 
+grados los ángulos de guiñada y cabeceo que minimizan la distancia de aproximación al planeta, que, como se demostró 
+en la introducción, es la clave para una asistencia gravitatoria efectiva.
+
+Los resultados, además, son físicamente muy interesantes; se ha encontrado una trayectoria que, efectivamente, 
+pierde energía al interactuar con Venus, cumpliendo el objetivo de "frenar" para acercarse al Sol
+($\Delta E \approx -2.9 \cdot 10^{10}$ J), pero también 
+se ha identificado otra que, por el contrario, gana energía, alejándose (con un $\Delta E \approx +1.7 \cdot 10^{11}$ J). 
+El análisis de las gráficas de energía de la nave confirma, de forma visual e inequívoca, estos saltos energéticos 
+justo en el momento del sobrevuelo; mientras que la conservación de la energía total del sistema, con un error 
+relativo del orden de $10^{-14}$, valida la robustez y estabilidad del integrador numérico implementado.
+
+No obstante, este trabajo, como todo modelo, posee sus limitaciones inherentes; la ausencia de propulsión activa 
+en la nave, la simplificación de la atmósfera de Venus a un umbral de colisión, o la no consideración de perturbaciones 
+gravitatorias de cuerpos menores, son factores que, sin duda, podrían refinarse en futuras investigaciones; 
+abriendo, así, nuevas vías para explorar optimizaciones multi-objetivo o, incluso, el diseño de complejas 
+cadenas de asistencias gravitatorias, que es un campo, por cierto, apasionante y que pensaba explorar con este 
+trabajo, pero no me ha sido posible.
+
+En definitiva, se ha construido una herramienta de simulación y análisis muy completa, que no solo ha 
+permitido recrear un fenómeno físico complejo con gran fidelidad, sino que también ha servido para aplicar 
+y visualizar conceptos fundamentales de la mecánica clásica, como son los problemas de dispersión, la importancia de las condiciones iniciales para evitar trayectorias catastróficas, y la 
+conservación de la energía y el momento angular, todo ello, además, con un resultado que, visualmente, es 
+bastante espectacular.

@@ -1,6 +1,5 @@
 #include "head.h"
 
-//Helper functions
 double norm(double* vec, int n) {
     double sum = 0.0;
     for(int i=0; i<n; i++) {
@@ -54,8 +53,8 @@ double MinimumDistance(Body* bodies, int index) {
 
 void CalculateSweep(double min, double max, double* sweep, int n) {
     double range = max - min;
-    if (n==1) {
-        *sweep = min; // Matching np.linspace behavior for n=1
+    if (n == 1) {
+        *sweep = min;
         return;
     }
     double step = range/(n-1);
@@ -117,7 +116,7 @@ int sim_id, int skip, int fps, double precision_factor, double max_dt, double mi
     
     FILE* bin_file = fopen(bin_filename, "wb");
     if (bin_file == NULL) {
-        printf("Couldn't create output file %s; kake sure the output folder exists.\n", bin_filename);
+        printf("Couldn't create output file %s; make sure the output folder exists.\n", bin_filename);
         return 0;
     }
     
@@ -184,7 +183,7 @@ int sim_id, int skip, int fps, double precision_factor, double max_dt, double mi
     //=======================================
     FILE* txt_file = fopen(txt_filename, "w");
     if (txt_file == NULL) {
-        printf("Couldn't create output file %s; kake sure the output folder exists.\n", txt_filename);
+        printf("Couldn't create output file %s; make sure the output folder exists.\n", txt_filename);
         return 0;
     }
     double final_ship_v = norm(bodies[SHIP_INDEX].vel, DIM);

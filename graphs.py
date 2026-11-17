@@ -13,8 +13,6 @@ import multiprocessing
 
 MAX_WORKERS = 8
 
-#Generated with the help of AI
-
 def compile_and_run_c():
     compile_cmd = ["gcc", "simulation.c", "functions.c", "RK4integrator.c", "-o", "sim.exe", "-O3", "-lm", "-fopenmp"]
     try:
@@ -143,15 +141,12 @@ def generate_plots(sim_id, batch_folder):
     plotter.camera_position = 'iso'
     plotter.camera.zoom(1.3)
     
-    # Save the static PNG
+    # Save static PNG and interactive HTML orbit view
     plotter.screenshot(os.path.join(output_folder, f"orbit_plot_{sim_id}.png"))
-    # Export an interactive HTML file that you can open in any browser!
     plotter.export_html(os.path.join(output_folder, f"interactive_orbit_{sim_id}.html"))
     plotter.close()
-    
-    # =========================================
-    # 2. Total Energy Stability
-    # =========================================
+
+    # Total Energy Stability
     fig, ax = plt.subplots(figsize=(10, 4))
     energy_change = (energy[::plot_skip] - energy[0]) / np.abs(energy[0])
     ax.plot(time_days[::plot_skip], energy_change, color='green')
@@ -161,10 +156,8 @@ def generate_plots(sim_id, batch_folder):
     ax.grid(True, alpha=0.3)
     plt.savefig(os.path.join(output_folder, f"total_energy_{sim_id}.png"), dpi=300, bbox_inches='tight')
     plt.close(fig)
-    
-    # =========================================
-    # 3. Ship Specific Energy
-    # =========================================
+
+    # Ship Specific Energy
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.plot(time_days[::plot_skip], ship_energy[::plot_skip], color='purple')
     ax.set_title("Ship Hamiltonian")
@@ -173,11 +166,8 @@ def generate_plots(sim_id, batch_folder):
     ax.grid(True, alpha=0.3)
     plt.savefig(os.path.join(output_folder, f"ship_energy_{sim_id}.png"), dpi=300, bbox_inches='tight')
     plt.close(fig)
-    
-    # =========================================
-    # 4. Animated MP4 Video
-    # =========================================
-    # Dynamically target ~400 total frames for a smooth ~13-second video
+
+    # Animated MP4 Video
     skip = max(1, len(time_days) // 400)
     plotter = pv.Plotter(window_size=[800, 800], off_screen=True)
     plotter.set_background('white')
@@ -191,9 +181,6 @@ def generate_plots(sim_id, batch_folder):
     frames = len(time_days) // skip
     for frame in range(frames):
         if frame % max(1, frames // 10) == 0:
-            if sim_id == 67: 
-                print(f"SIX SEVEN, SIX SEVEN")
-            
             print(f"  -> Sim {sim_id}: Rendering MP4 video... {frame/frames*100:.0f}%", flush=True)
 
         idx = min(frame * skip, len(time_days) - 1)
@@ -318,11 +305,9 @@ def generate_plots(sim_id, batch_folder):
     static_flyby_plotter.close()
 
 if __name__ == "__main__":
-    # 1. Compile, setup folders, and execute C engine
     print("Compiling and running sims...")
     total_simulations_run, batch_folder = compile_and_run_c()
-    
-    # 2. Generate plots for every simulation run
+
     count = 0
     with ProcessPoolExecutor(MAX_WORKERS) as executor:
         futures = {executor.submit(generate_plots, sim, batch_folder): sim for sim in range(1, total_simulations_run + 1)}
@@ -332,10 +317,9 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"\n[ERROR in Sim {futures[future]}] Plot generation failed: {e}")
             count += 1
-            print(f"[{count/total_simulations_run*100:3.0f}%] Completed full rendering pipeline for Sim {futures[future]}!", flush=True)
-        
-    # Clean up the temp file
+            print(f"[{count/total_simulations_run*100:3.0f}%] Completed rendering for Sim {futures[future]}", flush=True)
+
     if os.path.exists("batch_path.txt"):
         os.remove("batch_path.txt")
 
-    print("\n[SUCCESS] Entire pipeline completed.")
+    print("\nPipeline completed.")

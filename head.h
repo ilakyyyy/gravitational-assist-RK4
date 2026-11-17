@@ -80,7 +80,7 @@
 #define SHIP_R0_X (1.4709e11 * (1.0 - 1.0/999.0))
 #define SHIP_R0_Y 0.0
 #define SHIP_R0_Z 0.0
-#define SHIP_INDEX 0 //Careful if changing this value; change in RumSim Bodies array initialization
+#define SHIP_INDEX 0 // Must match the bodies array initialization in RunSimulation
 
 
 

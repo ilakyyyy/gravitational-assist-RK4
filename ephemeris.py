@@ -50,4 +50,4 @@ with open("ephemeris.txt", "w") as f:
         
         f.write(f"{x} {y} {z} {vx} {vy} {vz}\n")
 
-print("\n[SUCCESS] ephemeris.txt generated! The Solar System is ready.")
+print("\nephemeris.txt generated.")

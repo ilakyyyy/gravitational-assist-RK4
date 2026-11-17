@@ -1,0 +1,116 @@
+\section{Introducción y marco teórico}
+Este trabajo aspira a simular el Sistema Solar con datos realistas, para lograr recrear una 
+maniobra de asistencia gravtitatoria, 
+con datos y trayectoria similares a los de la nave \textbf{Solar Orbiter} de la Agencia Espacial Europea (ESA).
+
+Una asistencia gravitatoria consiste en el intercambio de energía, por medio de la variación del momento angular, 
+entre un cuerpo celeste y una nave.
+El objetivo del presente trabajo es intentar maximizar dicho intercambio de energía (que tendrá que ser negativo) 
+para acercarse lo 
+máximo posible al Sol.
+
+\subsection{Parámetros iniciales}
+Los parámetros físicos fundamentales utilizados en la simulación han sido extraídos de fuentes oficiales para 
+garantizar la precisión de los resultados. De la base de datos del \textit{Jet Propulsion Laboratory} (JPL) de 
+la NASA\footnote{\texttt{https://ssd.jpl.nasa.gov/astro\_par.html}}, han sido extraídos el valor de la 
+constante de gravitación universal $G$ y los 
+parámetros gravitacionales estandarizados de los distintos cuerpos. Dado que estos sistemas proporcionan 
+las masas en la forma del parámetro gravitacional $G M$, las masas individuales,
+$M_\circ$, $M_T$, $M_J$, $M_m$, $M_v$, han sido obtenidas dividiendo los valores por $G$. 
+Para ciertos parámetros orbitales específicos 
+y radios, como los de la Luna, se han consultado fuentes como la \textit{Planetary Fact Sheet} de la 
+NASA\footnote{\texttt{http://www.mathaddict.net/ellipseplanet.pdf}} y 
+tablas de mecánica celeste estandarizadas\footnote{\texttt{https://www.mnealon.eosc.edu/NewtonianMechanics.htm}}.
+
+Así, utilizando los datos aportados por el sistema \textit{Horizons} del JPL de la NASA, es posible simular 
+los planetas en su posición real el día en el que se lanzó el \textit{Solar Orbiter}. Dado que las coordenadas 
+de la nave no están disponibles en el momento exacto de lanzamiento (pues está en la Tierra), se toman las 
+coordenadas de los planetas a las 00:00 del 11 de febrero de 2020, unas 20 horas después del lanzamiento.
+
+\subsection{Condiciones iniciales de la nave}
+Para obtener unas condiciones iniciales realistas para la nave, se recurre de nuevo al sistema 
+\textit{Horizons} del JPL de la NASA para extraer tanto el vector de posición como el vector de velocidad 
+del \textit{Solar Orbiter} en ese instante, a las 00:00 del 11 de febrero de 2020. 
+
+% Al transcurrir este tiempo desde el lanzamiento, la sonda ya ha establecido su trayectoria de 
+% transferencia interplanetaria inicial, alejándose de la Tierra para escapar de su Esfera de Influencia, 
+% situándose a una distancia que aproximaremos a $\frac{49}{50}$ UA respecto a la posición original, 
+% o unos 3 millones de kilómetros, donde la perturbación gravitatoria terrestre es ya residual y 
+% no domina la dinámica orbital en favor del Sol.
+
+Esto permite fijar un módulo de velocidad inicial y una posición de partida que son físicamente realistas 
+y coherentes con la capacidad de los lanzadores de la misión real; sin embargo, si se utilizara 
+también la dirección exacta del vector velocidad proporcionado por el JPL, el trabajo quedaría reducido a una mera 
+recreación de la trayectoria histórica. 
+Debido a ello, dicha dirección será obviada y se planteará un problema de optimización:
+encontrar la dirección de lanzamiento óptima que minimice la distancia de aproximación a Venus para así maximizar
+la transferencia de energía entre el planeta y la nave.
+
+\subsubsection{Justificación Analítica de la Asistencia Gravitatoria}
+La relación entre la distancia de aproximación (periapsis, $r_p$) y el intercambio de energía se puede justificar analíticamente. 
+En el sistema de referencia planetario, la nave describe una trayectoria hiperbólica, 
+que no es más que la solución matemática de un problema de dispersión gravitatoria.
+Es análogo a la dispersión de Rutherford, siendo la única diferencia que tratamos con un potencial atrctivo en vez de repulsivo
+(potencial $V(r) \propto +1/r$ en vez de $V(r) \propto -1/r$).
+Esto resulta en un cambio de signo en la ecuación de la trayectoria, siendo la de la atractiva:
+$$r = \frac{p}{1 + \varepsilon\cos \beta}$$
+Sin embargo, la relación final entre el ángulo de 
+dispersión $\theta$ y la excentricidad se mantiene idéntica en ambos casos:
+$$\sin\left(\frac{\theta}{2}\right) = \frac{1}{\varepsilon}$$
+
+\paragraph{Excentricidad en función de la periapsis.}
+La excentricidad de una órbita en un campo de fuerzas centrales con potencial $V = -k/r$ viene dada por la expresión general:
+\begin{equation}
+    \varepsilon = \sqrt{1 + \frac{2 E J^2}{m k^2}}
+\end{equation}
+donde $E$ es la energía mecánica total, $J$ el momento angular total y $m$ la masa de la nave. Para el potencial gravitatorio, el factor $k$ es $k = G M_V m$, donde $M_V$ es la masa de Venus.
+\newpage
+Sustituyendo $k$ y las expresiones para la energía lejos del planeta ($E = \frac{1}{2}mv_\infty^2$) y el momento angular al cuadrado ($J^2 = m^2(r_p^2 v_\infty^2 + 2 G M_V r_p)$), obtenemos:
+\begin{equation}
+    \varepsilon^2 = 1 + \frac{2 \left(\frac{1}{2}mv_\infty^2\right) \left(m^2(r_p^2 v_\infty^2 + 2 G M_V r_p)\right)}{m(m G M_V)^2}
+\end{equation}
+Simplificando los términos de masa $m$:
+\begin{align}
+    \varepsilon^2 &= 1 + \frac{m^3 v_\infty^2 (r_p^2 v_\infty^2 + 2 G M_V r_p)}{m^3 (G M_V)^2} \nonumber \\
+    &= 1 + \frac{v_\infty^2 (r_p^2 v_\infty^2 + 2 G M_V r_p)}{(G M_V)^2} \nonumber \\
+    &= 1 + \frac{r_p^2 v_\infty^4}{(G M_V)^2} + \frac{2 r_p v_\infty^2}{G M_V} = \left(1 + \frac{r_p v_\infty^2}{G M_V}\right)^2
+\end{align}
+De donde se obtiene la relación fundamental, que es independiente de la masa de la nave ($m$):
+\begin{equation}
+    \varepsilon = 1 + \frac{r_p v_\infty^2}{G M_V}
+\end{equation}
+
+\paragraph{Ángulo de giro y cambio de velocidad.}
+Al sustituir la expresión de $\epsilon$ en la ecuación 1, se obtiene la primera fórmula clave:
+\begin{equation}
+    \sin\left(\frac{\theta}{2}\right) = \frac{1}{1 + \dfrac{r_p v_\infty^2}{G M_V}}
+\end{equation}
+El cambio de velocidad, $\Delta v$, se obtiene por geometría vectorial. 
+Dado que la energía se conserva, el módulo de la velocidad de entrada y de salida es el mismo ($v_\infty$). 
+El vector $\Delta \vec{v}$ forma la base de un triángulo isósceles, cuyo módulo es 
+$\Delta v = 2 v_\infty \sin(\theta/2)$. Combinando ambas ecuaciones, se obtiene la expresión final:
+\begin{equation}
+    \Delta v = \frac{2 v_\infty}{1 + \dfrac{r_p v_\infty^2}{G M_V}}
+\end{equation}
+Como se observa, para maximizar el cambioo de velocidad $\Delta v$ y maximizar la transferencia 
+energética, se debe minimizar la distancia de periapsis $r_p$.
+Sin embargo, esta optimización cuenta con una restricción física indispensable: 
+para que la sonda pueda continuar su misión, no debe colisionar con la superficie de Venus 
+ni desintegrarse por la fricción aerodinámica con la atmósfera (ni perder energía por esta). 
+\newpage
+Por tanto, la distancia mínima de aproximación debe cumplir siempre la condición límite de que 
+$r_p > R_V + h_{\text{atm}}$, siendo $R_V$ el radio del planeta y $h_{\text{atm}}$ el 
+límite superior de su atmósfera.
+Añadiremos, además, una holgura extra para evitar cualquier tipo de pérdida energética por un posible
+rozamiento con la atmósfera; el radio de Venus es de 6052km según las fuentes  
+nombradas anteriormente, y su exosfera se encuentra a 350km.
+
+Además, aunque el Sistema Solar interior es fundamentalmente coplanario, las órbitas presentan ligeras inclinaciones respecto a otras; 
+en nuestro caso concreto, la órbita de Venus tiene una inclinación de aproximadamente $3.4^\circ$ respecto a la eclíptica. 
+Si cada simulación estuviera limitara a un único grado de libertad variando solo el ángulo de guiñada, $\varphi$,
+la nave quedaría contenida en el mismo plano para todas las simulaciones.
+
+Debido a esto, se realizará un barrido sobre dos grados de libertad: el ángulo de guiñada (yaw), $\varphi$, y el de cabeceo
+(pitch), $\theta$.
+El hecho de mantener fijo el módulo de la velocidad a uno realista, permite acotar el coste computacional de las simulaciones,
+y restringir el mapa de soluciones a uno bidimensional, facilitando así su interpretación.

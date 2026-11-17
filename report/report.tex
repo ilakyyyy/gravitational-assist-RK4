@@ -1,0 +1,40 @@
+\documentclass{article}
+\usepackage{my_style}
+\usepackage{environ}
+\usepackage[font=scriptsize]{caption}
+\begin{document}
+
+\vspace*{3cm}
+\thispagestyle{empty}
+\begin{center}
+    {\huge \textbf{Simulación de Asistencia Gravitatoria}}\\
+    \vspace*{1cm}
+    {\LARGE Íñigo Aliod López}
+
+    \vspace*{.5cm}
+
+    {\large Mecánica Clásica I}
+\end{center}
+\vspace*{4cm}
+
+% \begin{figure}[h]
+%     \centering
+%     \resizebox{1\textwidth}{!}
+%     {\includegraphics{figuras/portada/portada.pdf}}
+% \end{figure}
+
+% \newpage
+
+\begin{abstract}
+\noindent En el presente trabajo se explora la optimización de una maniobra de asistencia gravitatoria, un problema central en la mecánica celeste, mediante la creación de un simulador N-cuerpos en C. Utilizando un integrador Runge-Kutta de cuarto orden con paso adaptativo, y orquestando barridos de parámetros con Python, se ha buscado sistemáticamente la dirección de lanzamiento óptima para una sonda inspirada en la misión Solar Orbiter. El análisis ha revelado la existencia de dos familias de trayectorias óptimas; una que resulta en una pérdida de energía de la nave, cumpliendo el objetivo de acercarse al Sol, y otra, que provoca una ganancia energética. Se concluye que la metodología de barrido en múltiples fases es una herramienta eficaz para la optimización de trayectorias interplanetarias, validando los resultados con un análisis riguroso de la conservación de la energía del sistema.
+\end{abstract}
+
+\newpage
+\tableofcontents
+
+\include{secciones/intro.tex}
+\include{secciones/sims.tex}
+\include{secciones/graphs.tex}
+\include{secciones/conclus.tex}
+
+\end{document}

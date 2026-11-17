@@ -50,4 +50,4 @@ if __name__ == "__main__":
     if os.path.exists("batch_path.txt"):
         os.remove("batch_path.txt")
         
-    print(f"\nSuccesfully completed {total_simulations_run}. Data saved in: {batch_folder}")
+    print(f"\nCompleted {total_simulations_run} simulations. Data saved in: {batch_folder}")
